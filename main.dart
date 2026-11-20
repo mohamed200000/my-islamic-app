@@ -12,10 +12,16 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await NotificationService.instance.init();
   await DataService.instance.loadAll();
+  final p = await DataService.prefs();
+  IslamicApp.fontScale.value = p.getDouble('fontScale') ?? 1.0;
+  IslamicApp.langIndex.value = p.getInt('langIndex') ?? 0;
   runApp(const IslamicApp());
 }
 
 class IslamicApp extends StatefulWidget {
+  static final ValueNotifier<double> fontScale = ValueNotifier<double>(1.0);
+  static final ValueNotifier<int> langIndex = ValueNotifier<int>(0);
+
   const IslamicApp({super.key});
   @override
   State<IslamicApp> createState() => _IslamicAppState();
@@ -32,36 +38,56 @@ class _IslamicAppState extends State<IslamicApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'تطبيق مواقيت الصلاة والأذكار',
-      debugShowCheckedModeBanner: false,
-      locale: const Locale('ar'),
-      supportedLocales: const [Locale('ar')],
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      themeMode: _themeMode,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF114B3E),
-          surface: const Color(0xFFFFFFFF),
-        ),
-        scaffoldBackgroundColor: const Color(0xFFFAF8F3),
-      ),
-      darkTheme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFD4AF63),
-          brightness: Brightness.dark,
-          surface: const Color(0xFF122620),
-        ),
-        scaffoldBackgroundColor: const Color(0xFF0B1915),
-      ),
-      home: AppShell(onThemeChanged: _toggleTheme, themeMode: _themeMode),
+    return ValueListenableBuilder<double>(
+      valueListenable: IslamicApp.fontScale,
+      builder: (_, scale, __) {
+        return ValueListenableBuilder<int>(
+          valueListenable: IslamicApp.langIndex,
+          builder: (_, langIdx, __) {
+            final isLtr = langIdx == 1 || langIdx == 2 || langIdx == 3 || langIdx == 5;
+            return MaterialApp(
+              title: 'آثر المؤذن',
+              debugShowCheckedModeBanner: false,
+              locale: const Locale('ar'),
+              supportedLocales: const [Locale('ar')],
+              localizationsDelegates: const [
+                GlobalMaterialLocalizations.delegate,
+                GlobalWidgetsLocalizations.delegate,
+                GlobalCupertinoLocalizations.delegate,
+              ],
+              builder: (ctx, child) {
+                return Directionality(
+                  textDirection: isLtr ? TextDirection.ltr : TextDirection.rtl,
+                  child: MediaQuery(
+                    data: MediaQuery.of(ctx).copyWith(textScaler: TextScaler.linear(scale)),
+                    child: child!,
+                  ),
+                );
+              },
+              themeMode: _themeMode,
+              theme: ThemeData(
+                useMaterial3: true,
+                colorScheme: ColorScheme.fromSeed(
+                  seedColor: const Color(0xFF114B3E),
+                  surface: const Color(0xFFFFFFFF),
+                ),
+                scaffoldBackgroundColor: const Color(0xFFFAF8F3),
+              ),
+              darkTheme: ThemeData(
+                useMaterial3: true,
+                brightness: Brightness.dark,
+                colorScheme: ColorScheme.fromSeed(
+                  seedColor: const Color(0xFFD4AF63),
+                  brightness: Brightness.dark,
+                  surface: const Color(0xFF122620),
+                ),
+                scaffoldBackgroundColor: const Color(0xFF0B1915),
+              ),
+              home: AppShell(onThemeChanged: _toggleTheme, themeMode: _themeMode),
+            );
+          },
+        );
+      },
     );
   }
 }
