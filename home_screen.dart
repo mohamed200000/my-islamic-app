@@ -22,6 +22,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Duration _remaining = Duration.zero;
   String _nextName = '';
   DateTime? _nextTime;
+  bool _locLoading = false;
 
   @override
   void initState() {
@@ -38,25 +39,42 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _load() async {
     final p = await DataService.prefs();
-    _govIdx = p.getInt('govIdx') ?? 0;
-    _gpsLat = p.getDouble('gpsLat');
-    _gpsLng = p.getDouble('gpsLng');
+    final govIdx = p.getInt('govIdx') ?? 0;
+    final gpsLat = p.getDouble('gpsLat');
+    final gpsLng = p.getDouble('gpsLng');
 
-    final lat = (_govIdx == 27 && _gpsLat != null) ? _gpsLat! : governorates[_govIdx.clamp(0, 26)].lat;
-    final lng = (_govIdx == 27 && _gpsLng != null) ? _gpsLng! : governorates[_govIdx.clamp(0, 26)].lng;
+    final lat = (govIdx == 27 && gpsLat != null) ? gpsLat : governorates[govIdx.clamp(0, 26)].lat;
+    final lng = (govIdx == 27 && gpsLng != null) ? gpsLng : governorates[govIdx.clamp(0, 26)].lng;
     final method = p.getInt('calcMethod') ?? 5;
     final hanafi = p.getBool('hanafiAsr') ?? false;
 
     final service = PrayerService(lat: lat, lng: lng, method: method, hanafiAsr: hanafi);
-    final pt = await service.forDate(DateTime.now());
-    final enabled = List.generate(5, (i) => p.getBool('an_$i') ?? true);
-    final khatmahFajr = p.getBool('khatmahFajr') ?? true;
-    await NotificationService.instance.schedulePrayers(pt, enabled, khatmahFajr);
 
+    final localPt = service.local(DateTime.now());
     if (mounted) {
-      setState(() => _pt = pt);
+      setState(() {
+        _govIdx = govIdx;
+        _gpsLat = gpsLat;
+        _gpsLng = gpsLng;
+        _pt = localPt;
+      });
       _updateCountdown();
     }
+
+    PrayerTimes pt = localPt;
+    try {
+      pt = await service.forDate(DateTime.now());
+      if (mounted) {
+        setState(() => _pt = pt);
+        _updateCountdown();
+      }
+    } catch (_) {}
+
+    try {
+      final enabled = List.generate(5, (i) => p.getBool('an_$i') ?? true);
+      final khatmahFajr = p.getBool('khatmahFajr') ?? true;
+      await NotificationService.instance.schedulePrayers(pt, enabled, khatmahFajr);
+    } catch (_) {}
   }
 
   void _updateCountdown() {
@@ -79,18 +97,54 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  void _msg(String text) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
   Future<void> _useGps() async {
+    if (_locLoading) return;
+    setState(() => _locLoading = true);
     try {
+      final enabled = await Geolocator.isLocationServiceEnabled();
+      if (!enabled) {
+        _msg('يرجى تشغيل خدمة الموقع (GPS) في الهاتف أولاً');
+        return;
+      }
       var perm = await Geolocator.checkPermission();
-      if (perm == LocationPermission.denied) perm = await Geolocator.requestPermission();
-      if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) return;
-      final pos = await Geolocator.getCurrentPosition();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+      }
+      if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) {
+        _msg('يرجى السماح للتطبيق بالوصول إلى الموقع من الإعدادات');
+        return;
+      }
+      Position? pos;
+      try {
+        pos = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.medium,
+            timeLimit: Duration(seconds: 10),
+          ),
+        );
+      } catch (_) {
+        pos = await Geolocator.getLastKnownPosition();
+      }
+      if (pos == null) {
+        _msg('تعذر تحديد الموقع حالياً، تأكد من إشارة GPS');
+        return;
+      }
       final p = await DataService.prefs();
       await p.setDouble('gpsLat', pos.latitude);
       await p.setDouble('gpsLng', pos.longitude);
       await p.setInt('govIdx', 27);
       await _load();
-    } catch (_) {}
+      _msg('تم تحديث المواقيت من موقعك بنجاح');
+    } catch (e) {
+      _msg('تعذر تحديد الموقع: حاول مرة أخرى');
+    } finally {
+      if (mounted) setState(() => _locLoading = false);
+    }
   }
 
   String _fmt(DateTime dt) {
@@ -111,11 +165,12 @@ class _HomeScreenState extends State<HomeScreen> {
     HijriCalendar.setLocal('ar');
     final hijri = HijriCalendar.now();
     final hijriText = '${hijri.hDay} ${hijri.longMonthName} ${hijri.hYear} هـ';
+    final primary = Theme.of(context).colorScheme.primary;
 
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        const Text('مواقيت الصلاة', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF0F3D33))),
+        Text('مواقيت الصلاة', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: primary)),
         const SizedBox(height: 10),
         DropdownButtonFormField<int>(
           value: _govIdx,
@@ -134,7 +189,11 @@ class _HomeScreenState extends State<HomeScreen> {
         const SizedBox(height: 12),
         Container(
           padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(color: const Color(0xFF0F3D33), borderRadius: BorderRadius.circular(22)),
+          decoration: BoxDecoration(
+            color: const Color(0xFF114B3E),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: const Color(0xFFB68D40).withOpacity(0.45)),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -146,7 +205,7 @@ class _HomeScreenState extends State<HomeScreen> {
               const Text('الصلاة القادمة', style: TextStyle(color: Colors.white70)),
               Text(
                 _nextTime != null ? '$_nextName ${_fmt(_nextTime!)}' : 'جارٍ الحساب...',
-                style: const TextStyle(color: Color(0xFFF6F1E6), fontSize: 32, fontWeight: FontWeight.bold),
+                style: const TextStyle(color: Color(0xFFFAF8F3), fontSize: 32, fontWeight: FontWeight.bold),
               ),
               Text(_fmtDur(_remaining), style: const TextStyle(color: Color(0xFFE8D9B0), fontSize: 20)),
             ],
@@ -159,7 +218,7 @@ class _HomeScreenState extends State<HomeScreen> {
               children: _pt!.allSix.map((e) {
                 final isNext = e.key == _nextName;
                 return ListTile(
-                  tileColor: isNext ? const Color(0xFFEADFC2) : null,
+                  tileColor: isNext ? primary.withOpacity(0.14) : null,
                   title: Text(e.key, style: TextStyle(fontWeight: isNext ? FontWeight.bold : FontWeight.normal)),
                   trailing: Text(_fmt(e.value), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                 );
@@ -168,9 +227,11 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         const SizedBox(height: 8),
         ElevatedButton.icon(
-          onPressed: _useGps,
-          icon: const Icon(Icons.my_location),
-          label: const Text('تحديث من موقعي (GPS)'),
+          onPressed: _locLoading ? null : _useGps,
+          icon: _locLoading
+              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.my_location),
+          label: Text(_locLoading ? 'جارٍ تحديد الموقع...' : 'تحديث من موقعي (GPS)'),
         ),
       ],
     );
