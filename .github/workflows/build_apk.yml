@@ -16,7 +16,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-      - name: Organize files & create Android project
+      - name: Organize files, icon & Android config
         run: |
           mkdir -p lib/data lib/services lib/screens assets/data assets/audio licenses
           [ -f main.dart ] && mv main.dart lib/
@@ -27,6 +27,7 @@ jobs:
           mv *.mp3 assets/audio/ 2>/dev/null || true
           mv *-NOTICE.txt *-LICENSE-MIT.md licenses/ 2>/dev/null || true
           [ ! -d "android" ] && flutter create . --org com.islamicapp --platforms android
+          pip install -q pillow
           python3 -c '
           import os, re
           p="android/app/src/main/AndroidManifest.xml"
@@ -50,10 +51,18 @@ jobs:
                   g=g.replace("compileOptions {","compileOptions {\n        coreLibraryDesugaringEnabled true",1)
                   g+="\ndependencies {\n    coreLibraryDesugaring \"com.android.tools:desugar_jdk_libs:2.1.4\"\n}\n"
                   open(gr,"w").write(g)
+          icon=next((f for f in ["app_icon.jpg","app_icon.png"] if os.path.exists(f)),None)
+          if icon:
+              from PIL import Image
+              im=Image.open(icon).convert("RGBA")
+              for d,sz in [("mdpi",48),("hdpi",72),("xhdpi",96),("xxhdpi",144),("xxxhdpi",192)]:
+                  out=f"android/app/src/main/res/mipmap-{d}/ic_launcher.png"
+                  os.makedirs(os.path.dirname(out),exist_ok=True)
+                  im.resize((sz,sz),Image.LANCZOS).save(out,"PNG")
           '
       - run: flutter pub get
-      - run: flutter build apk --release
+      - run: flutter build apk --release --split-per-abi
       - uses: actions/upload-artifact@v4
         with:
           name: islamic-app-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: build/app/outputs/flutter-apk/*-release.apk
