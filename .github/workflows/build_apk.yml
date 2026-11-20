@@ -56,8 +56,8 @@ jobs:
           rb="android/build.gradle.kts" if os.path.exists("android/build.gradle.kts") else "android/build.gradle"
           if os.path.exists(rb):
               r=open(rb).read()
-              if "toLowerCase().contains(\"lint\")" not in r:
-                  r+="\nsubprojects {\n    tasks.configureEach {\n        if (name.toLowerCase().contains(\"lint\")) {\n            enabled = false\n        }\n    }\n}\n"
+              if "lowercase().contains(\"lint\")" not in r:
+                  r+="\nsubprojects {\n    tasks.configureEach {\n        if (name.lowercase().contains(\"lint\")) {\n            enabled = false\n        }\n    }\n}\n"
                   open(rb,"w").write(r)
           icon=next((f for f in ["app_icon.jpg","app_icon.png"] if os.path.exists(f)),None)
           if icon:
