@@ -28,11 +28,26 @@ jobs:
           mv *-NOTICE.txt *-LICENSE-MIT.md licenses/ 2>/dev/null || true
           [ ! -d "android" ] && flutter create . --org com.islamicapp --platforms android
           python3 -c '
+          import os
           p="android/app/src/main/AndroidManifest.xml"
           s=open(p).read()
           perms=["INTERNET","ACCESS_FINE_LOCATION","ACCESS_COARSE_LOCATION","POST_NOTIFICATIONS","SCHEDULE_EXACT_ALARM","RECEIVE_BOOT_COMPLETED"]
           ins="\n    ".join(f"<uses-permission android:name=\"android.permission.{x}\"/>" for x in perms if x not in s)
           if ins: open(p,"w").write(s.replace("<application",f"    {ins}\n    <application",1))
+          kts="android/app/build.gradle.kts"
+          gr="android/app/build.gradle"
+          if os.path.exists(kts):
+              g=open(kts).read()
+              if "isCoreLibraryDesugaringEnabled" not in g:
+                  g=g.replace("compileOptions {","compileOptions {\n        isCoreLibraryDesugaringEnabled = true",1)
+                  g+="\ndependencies {\n    coreLibraryDesugaring(\"com.android.tools:desugar_jdk_libs:2.1.4\")\n}\n"
+                  open(kts,"w").write(g)
+          elif os.path.exists(gr):
+              g=open(gr).read()
+              if "coreLibraryDesugaringEnabled" not in g:
+                  g=g.replace("compileOptions {","compileOptions {\n        coreLibraryDesugaringEnabled true",1)
+                  g+="\ndependencies {\n    coreLibraryDesugaring \"com.android.tools:desugar_jdk_libs:2.1.4\"\n}\n"
+                  open(gr,"w").write(g)
           '
       - run: flutter pub get
       - run: flutter build apk --release
