@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:hijri/hijri_calendar.dart';
+import '../main.dart';
 import '../data/governorates.dart';
 import '../services/data_service.dart';
 import '../services/notification_service.dart';
@@ -23,6 +24,14 @@ class _HomeScreenState extends State<HomeScreen> {
   String _nextName = '';
   DateTime? _nextTime;
   bool _locLoading = false;
+  bool _showFontBar = false;
+
+  static const _langs = ['العربية', 'English', 'Français', 'Türkçe', 'اردو', 'Indonesia'];
+  static const _tTitle = ['مواقيت الصلاة', 'Prayer Times', 'Heures de prière', 'Namaz Vakitleri', 'نماز کے اوقات', 'Waktu Salat'];
+  static const _tNext = ['الصلاة القادمة', 'Next prayer', 'Prochaine prière', 'Sıradaki namaz', 'اگلی نماز', 'Salat berikutnya'];
+  static const _tLang = ['اللغة', 'Language', 'Langue', 'Dil', 'زبان', 'Bahasa'];
+  static const _tGov = ['المحافظة / الموقع', 'Governorate / Location', 'Gouvernorat', 'Vilayet', 'محافظہ', 'Provinsi'];
+  static const _tGps = ['تحديث من موقعي (GPS)', 'Use my location (GPS)', 'Utiliser ma position', 'Konumumu kullan', 'میرا مقام استعمال کریں', 'Gunakan lokasi saya'];
 
   @override
   void initState() {
@@ -166,15 +175,77 @@ class _HomeScreenState extends State<HomeScreen> {
     final hijri = HijriCalendar.now();
     final hijriText = '${hijri.hDay} ${hijri.longMonthName} ${hijri.hYear} هـ';
     final primary = Theme.of(context).colorScheme.primary;
+    final lg = IslamicApp.langIndex.value.clamp(0, 5);
+    final sc = IslamicApp.fontScale.value;
 
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text('مواقيت الصلاة', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: primary)),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(_tTitle[lg], style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: primary)),
+            OutlinedButton(
+              onPressed: () => setState(() => _showFontBar = !_showFontBar),
+              child: const Text('Aa', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            ),
+          ],
+        ),
+        if (_showFontBar)
+          Card(
+            margin: const EdgeInsets.only(top: 8, bottom: 8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  OutlinedButton(
+                    onPressed: () async {
+                      final next = (sc - 0.1).clamp(0.85, 1.5);
+                      IslamicApp.fontScale.value = next;
+                      (await DataService.prefs()).setDouble('fontScale', next);
+                      setState(() {});
+                    },
+                    child: const Text('أ-'),
+                  ),
+                  Text('${(sc * 100).round()}%', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  OutlinedButton(
+                    onPressed: () async {
+                      final next = (sc + 0.1).clamp(0.85, 1.5);
+                      IslamicApp.fontScale.value = next;
+                      (await DataService.prefs()).setDouble('fontScale', next);
+                      setState(() {});
+                    },
+                    child: const Text('أ+'),
+                  ),
+                  TextButton(
+                    onPressed: () async {
+                      IslamicApp.fontScale.value = 1.0;
+                      (await DataService.prefs()).setDouble('fontScale', 1.0);
+                      setState(() {});
+                    },
+                    child: const Text('الافتراضي'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<int>(
+          value: lg,
+          decoration: InputDecoration(labelText: _tLang[lg], border: const OutlineInputBorder()),
+          items: List.generate(_langs.length, (i) => DropdownMenuItem(value: i, child: Text(_langs[i]))),
+          onChanged: (v) async {
+            if (v == null) return;
+            IslamicApp.langIndex.value = v;
+            (await DataService.prefs()).setInt('langIndex', v);
+            setState(() {});
+          },
+        ),
         const SizedBox(height: 10),
         DropdownButtonFormField<int>(
           value: _govIdx,
-          decoration: const InputDecoration(labelText: 'المحافظة / الموقع', border: OutlineInputBorder()),
+          decoration: InputDecoration(labelText: _tGov[lg], border: const OutlineInputBorder()),
           items: [
             ...List.generate(governorates.length, (i) => DropdownMenuItem(value: i, child: Text(governorates[i].name))),
             if (_gpsLat != null) const DropdownMenuItem(value: 27, child: Text('موقعي الحالي (GPS)')),
@@ -202,7 +273,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 style: const TextStyle(color: Color(0xFFE8D9B0), fontSize: 13),
               ),
               const SizedBox(height: 10),
-              const Text('الصلاة القادمة', style: TextStyle(color: Colors.white70)),
+              Text(_tNext[lg], style: const TextStyle(color: Colors.white70)),
               Text(
                 _nextTime != null ? '$_nextName ${_fmt(_nextTime!)}' : 'جارٍ الحساب...',
                 style: const TextStyle(color: Color(0xFFFAF8F3), fontSize: 32, fontWeight: FontWeight.bold),
@@ -231,7 +302,7 @@ class _HomeScreenState extends State<HomeScreen> {
           icon: _locLoading
               ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
               : const Icon(Icons.my_location),
-          label: Text(_locLoading ? 'جارٍ تحديد الموقع...' : 'تحديث من موقعي (GPS)'),
+          label: Text(_locLoading ? 'جارٍ تحديد الموقع...' : _tGps[lg]),
         ),
       ],
     );
