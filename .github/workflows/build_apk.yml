@@ -46,17 +46,19 @@ jobs:
               if "isCoreLibraryDesugaringEnabled" not in g:
                   g=g.replace("compileOptions {","compileOptions {\n        isCoreLibraryDesugaringEnabled = true",1)
                   g+="\ndependencies {\n    coreLibraryDesugaring(\"com.android.tools:desugar_jdk_libs:2.1.4\")\n}\n"
-              if "lintVital" not in g:
-                  g+="\ntasks.matching { it.name.contains(\"lintVital\") }.configureEach { enabled = false }\n"
               open(kts,"w").write(g)
           elif os.path.exists(gr):
               g=open(gr).read()
               if "coreLibraryDesugaringEnabled" not in g:
                   g=g.replace("compileOptions {","compileOptions {\n        coreLibraryDesugaringEnabled true",1)
                   g+="\ndependencies {\n    coreLibraryDesugaring \"com.android.tools:desugar_jdk_libs:2.1.4\"\n}\n"
-              if "lintVital" not in g:
-                  g+="\ntasks.matching { it.name.contains(\"lintVital\") }.configureEach { enabled = false }\n"
               open(gr,"w").write(g)
+          rb="android/build.gradle.kts" if os.path.exists("android/build.gradle.kts") else "android/build.gradle"
+          if os.path.exists(rb):
+              r=open(rb).read()
+              if "toLowerCase().contains(\"lint\")" not in r:
+                  r+="\nsubprojects {\n    tasks.configureEach {\n        if (name.toLowerCase().contains(\"lint\")) {\n            enabled = false\n        }\n    }\n}\n"
+                  open(rb,"w").write(r)
           icon=next((f for f in ["app_icon.jpg","app_icon.png"] if os.path.exists(f)),None)
           if icon:
               from PIL import Image
