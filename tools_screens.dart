@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
@@ -42,8 +43,8 @@ class _TasbihScreenState extends State<TasbihScreen> {
               },
               style: ElevatedButton.styleFrom(
                 shape: const CircleBorder(),
-                backgroundColor: const Color(0xFF0F3D33),
-                foregroundColor: const Color(0xFFF6F1E6),
+                backgroundColor: const Color(0xFF114B3E),
+                foregroundColor: const Color(0xFFFAF8F3),
                 padding: const EdgeInsets.all(64),
               ),
               child: Text('$_count', style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold)),
@@ -191,10 +192,10 @@ class _ZakatScreenState extends State<ZakatScreen> {
               ),
             ),
           Card(
-            color: const Color(0xFF0F3D33),
+            color: const Color(0xFF114B3E),
             child: Padding(
               padding: const EdgeInsets.all(18),
-              child: Text(result, style: const TextStyle(color: Color(0xFFF6F1E6), fontSize: 18, fontWeight: FontWeight.bold)),
+              child: Text(result, style: const TextStyle(color: Color(0xFFFAF8F3), fontSize: 18, fontWeight: FontWeight.bold)),
             ),
           ),
         ],
@@ -212,6 +213,9 @@ class RemindersScreen extends StatefulWidget {
 class _RemindersScreenState extends State<RemindersScreen> {
   bool _istighfar = false;
   bool _salawat = false;
+  int _minutes = 5;
+  int _secLeft = 300;
+  Timer? _timer;
 
   @override
   void initState() {
@@ -221,36 +225,101 @@ class _RemindersScreenState extends State<RemindersScreen> {
         setState(() {
           _istighfar = p.getBool('remIstighfar') ?? false;
           _salawat = p.getBool('remSalawat') ?? false;
+          _minutes = p.getInt('remMinutes') ?? 5;
+          _secLeft = _minutes * 60;
         });
       }
     });
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted || (!_istighfar && !_salawat)) return;
+      setState(() {
+        if (_secLeft > 1) {
+          _secLeft--;
+        } else {
+          _secLeft = _minutes * 60;
+        }
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
   }
 
   Future<void> _update() async {
     final p = await DataService.prefs();
     await p.setBool('remIstighfar', _istighfar);
     await p.setBool('remSalawat', _salawat);
-    await NotificationService.instance.scheduleDhikrReminders(istighfarOn: _istighfar, salawatOn: _salawat, minutes: 5);
+    await p.setInt('remMinutes', _minutes);
+    setState(() => _secLeft = _minutes * 60);
+    await NotificationService.instance.scheduleDhikrReminders(
+      istighfarOn: _istighfar,
+      salawatOn: _salawat,
+      minutes: _minutes,
+    );
+  }
+
+  String _fmtTimer() {
+    final m = (_secLeft ~/ 60).toString().padLeft(2, '0');
+    final s = (_secLeft % 60).toString().padLeft(2, '0');
+    return '$m:$s';
   }
 
   @override
   Widget build(BuildContext context) {
+    final active = _istighfar || _salawat;
     return Scaffold(
       appBar: AppBar(title: const Text('تنبيه الاستغفار والصلاة على النبي ﷺ')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: const Color(0xFF114B3E),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFFB68D40).withOpacity(0.5)),
+            ),
+            child: Column(
+              children: [
+                const Text('أَسْتَغْفِرُ اللَّهَ الْعَظِيمَ وَأَتُوبُ إِلَيْهِ',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Color(0xFFFAF8F3), fontSize: 19, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                const Text('اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ ﷺ',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Color(0xFFE8D9B0), fontSize: 18, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 14),
+                Text(
+                  active ? 'العد التنازلي للتنبيه القادم: ${_fmtTimer()}' : 'فعّل أحد التنبيهات بالأسفل لبدء العداد',
+                  style: const TextStyle(color: Colors.white, fontSize: 16),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
           SwitchListTile(
             title: const Text('تفعيل تنبيه الاستغفار'),
-            subtitle: const Text('أَسْتَغْفِرُ اللَّهَ الْعَظِيمَ وَأَتُوبُ إِلَيْهِ'),
             value: _istighfar,
             onChanged: (v) { setState(() => _istighfar = v); _update(); },
           ),
           SwitchListTile(
-            title: const Text('تذكير الصلاة على سيدنا محمد ﷺ (كل ٥ دقائق)'),
-            subtitle: const Text('اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ ﷺ'),
+            title: const Text('تفعيل الصلاة على سيدنا محمد ﷺ'),
             value: _salawat,
             onChanged: (v) { setState(() => _salawat = v); _update(); },
+          ),
+          const SizedBox(height: 8),
+          const Text('التكرار كل:', style: TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 8,
+            children: [5, 10, 15, 30].map((m) => ChoiceChip(
+              label: Text('$m دقائق'),
+              selected: _minutes == m,
+              onSelected: (_) { setState(() => _minutes = m); _update(); },
+            )).toList(),
           ),
         ],
       ),
@@ -277,6 +346,20 @@ class _AdhanScreenState extends State<AdhanScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    DataService.prefs().then((p) {
+      if (mounted) setState(() => _selected = (p.getInt('selectedAdhan') ?? 0).clamp(0, 4));
+    });
+  }
+
+  Future<void> _select(int i) async {
+    setState(() => _selected = i);
+    final p = await DataService.prefs();
+    await p.setInt('selectedAdhan', i);
+  }
+
+  @override
   void dispose() {
     _player.dispose();
     super.dispose();
@@ -291,7 +374,8 @@ class _AdhanScreenState extends State<AdhanScreen> {
         itemCount: _files.length,
         itemBuilder: (_, i) => Card(
           child: ListTile(
-            leading: Radio<int>(value: i, groupValue: _selected, onChanged: (v) => setState(() => _selected = v!)),
+            onTap: () => _select(i),
+            leading: Radio<int>(value: i, groupValue: _selected, onChanged: (v) => _select(v!)),
             title: Text(_files[i][0]),
             trailing: FilledButton(
               onPressed: () async {
@@ -345,8 +429,8 @@ class _FacelessPosePainter extends CustomPainter {
   _FacelessPosePainter(this.step);
   @override
   void paint(Canvas canvas, Size size) {
-    final p = Paint()..color = const Color(0xFF0F3D33)..strokeWidth = 4..style = PaintingStyle.stroke..strokeCap = StrokeCap.round;
-    final fill = Paint()..color = const Color(0xFF0F3D33)..style = PaintingStyle.fill;
+    final p = Paint()..color = const Color(0xFF114B3E)..strokeWidth = 4..style = PaintingStyle.stroke..strokeCap = StrokeCap.round;
+    final fill = Paint()..color = const Color(0xFF114B3E)..style = PaintingStyle.fill;
     canvas.drawLine(Offset(6, size.height - 6), Offset(size.width - 6, size.height - 6), Paint()..color = Colors.grey..strokeWidth = 2);
     if (step <= 1) {
       canvas.drawCircle(Offset(size.width / 2, 16), 7, fill);
@@ -433,7 +517,7 @@ class _UsersStatsScreenState extends State<UsersStatsScreen> {
                   children: [
                     const Text('عدد المستخدمين الحاليين', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                     const SizedBox(height: 8),
-                    Text(_status, style: const TextStyle(fontSize: 16, color: Color(0xFF7A5A1A), fontWeight: FontWeight.bold)),
+                    Text(_status, style: const TextStyle(fontSize: 16, color: Color(0xFFB68D40), fontWeight: FontWeight.bold)),
                   ],
                 ),
               ),
