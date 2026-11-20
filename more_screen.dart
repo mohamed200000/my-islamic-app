@@ -7,6 +7,7 @@ import 'stories_screen.dart';
 import 'hadith_screen.dart';
 import 'sunan_prayers_screen.dart';
 import 'tools_screens.dart';
+import 'extra_screens.dart';
 
 class MoreScreen extends StatelessWidget {
   final void Function(bool dark) onThemeChanged;
@@ -18,19 +19,41 @@ class MoreScreen extends StatelessWidget {
     final items = <_MenuItem>[
       _MenuItem('القرآن الكريم', Icons.menu_book, const QuranScreen()),
       _MenuItem('تفسير الميسر', Icons.book_outlined, const TafsirScreen()),
+      _MenuItem('جدول المواقيت الشهري', Icons.table_chart_outlined, const TimetableScreen()),
       _MenuItem('حصن المسلم', Icons.shield_outlined, const HisnScreen()),
+      _MenuItem('أركان الإسلام', Icons.account_balance_outlined, const FiqhGuideScreen(title: 'أركان الإسلام', sections: [
+        ['١. الشهادتان', 'شهادة أن لا إله إلا الله وأن محمداً رسول الله، مع اليقين بهما والعمل بمقتضاهما.'],
+        ['٢. الصلاة', 'خمس صلوات في اليوم والليلة: الفجر ركعتان، الظهر أربع، العصر أربع، المغرب ثلاث، العشاء أربع.'],
+        ['٣. الزكاة', 'حق مالي واجب يُخرج لمستحقيه إذا بلغ المال النصاب وحال عليه الحول.'],
+        ['٤. صوم رمضان', 'الإمساك عن المفطرات من طلوع الفجر إلى غروب الشمس بنية الصيام طوال شهر رمضان.'],
+        ['٥. الحج', 'قصد بيت الله الحرام لأداء المناسك، فرض مرة في العمر على المستطيع.'],
+      ])),
+      _MenuItem('الزكاة والصدقات', Icons.volunteer_activism_outlined, const FiqhGuideScreen(title: 'الزكاة والصدقات', sections: [
+        ['النصاب والمقدار', 'نصاب الذهب ٨٥ جراماً عيار ٢٤، والمقدار الواجب ٢٫٥٪ بعد تمام الحول الهجري.'],
+        ['مصارف الزكاة', 'الفقراء، المساكين، العاملون عليها، المؤلفة قلوبهم، في الرقاب، الغارمون، في سبيل الله، ابن السبيل.'],
+        ['زكاة الفطر', 'واجبة عند ختام رمضان وتُخرج قبل صلاة العيد، مقدارها صاع من طعام أو قيمتها.'],
+      ])),
+      _MenuItem('الصيام وأيامه', Icons.nights_stay_outlined, const FiqhGuideScreen(title: 'الصيام وأيامه', sections: [
+        ['صيام التطوع', 'الاثنين والخميس، والأيام البيض (١٣ و١٤ و١٥)، وست من شوال، وعرفة، وعاشوراء والتاسع.'],
+        ['سنن الصيام', 'السحور («تسحروا فإن في السحور بركة»)، وتعجيل الفطر على رطب أو تمر أو ماء.'],
+        ['أيام يُنهى عن صيامها', 'يوم عيد الفطر والأضحى، وأيام التشريق، وإفراد الجمعة إلا مع يوم قبله أو بعده.'],
+      ])),
+      _MenuItem('كيف أصلي والوضوء', Icons.accessibility_new, const PrayerGuideScreen()),
+      _MenuItem('الصلوات المسنونة والنوافل', Icons.star_outline, const SunanPrayersScreen()),
       _MenuItem('قصص وعبر (أثر)', Icons.auto_stories, const StoriesScreen()),
       _MenuItem('الأحاديث الصحيحة', Icons.format_quote, const HadithScreen()),
-      _MenuItem('الصلوات المسنونة والنوافل', Icons.star_outline, const SunanPrayersScreen()),
-      _MenuItem('السبحة', Icons.touch_app, const TasbihScreen()),
+      _MenuItem('سور من السنة', Icons.auto_awesome_outlined, const SunnahSurahsScreen()),
+      _MenuItem('التقويم الهجري', Icons.calendar_month_outlined, const HijriCalScreen()),
+      _MenuItem('متابعة الصلاة', Icons.check_circle_outline, const PrayerTrackerScreen()),
       _MenuItem('ختمة القرآن', Icons.bookmark_added, const KhatmahScreen()),
-      _MenuItem('حاسبة الزكاة', Icons.calculate, const ZakatScreen()),
+      _MenuItem('السبحة', Icons.touch_app, const TasbihScreen()),
       _MenuItem('تنبيه الاستغفار والصلاة على النبي ﷺ', Icons.notifications_active, const RemindersScreen()),
       _MenuItem('إعدادات الأذان', Icons.volume_up, const AdhanScreen()),
-      _MenuItem('كيف أصلي والوضوء', Icons.accessibility_new, const PrayerGuideScreen()),
-      _MenuItem('أقرب المساجد', Icons.location_on, const MosquesScreen()),
+      _MenuItem('حاسبة الزكاة', Icons.calculate, const ZakatScreen()),
+      _MenuItem('أقرب المساجد', Icons.location_on, const InAppMosquesScreen()),
       _MenuItem('الويدجت والساعة', Icons.watch, const WidgetsScreen()),
       _MenuItem('المستخدمون والإحصائيات', Icons.people_outline, const UsersStatsScreen()),
+      _MenuItem('المصادر والتراخيص', Icons.info_outline, const AboutScreen()),
       _MenuItem('الإعدادات', Icons.settings, SettingsScreen(onThemeChanged: onThemeChanged, themeMode: themeMode)),
     ];
 
