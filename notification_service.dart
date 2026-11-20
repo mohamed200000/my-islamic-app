@@ -28,7 +28,7 @@ class NotificationService {
     } catch (_) {}
   }
 
-  Future> checkPermissions() async {
+  Future checkPermissions() async {
     await init();
     final androidImpl = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
     bool notif = true;
