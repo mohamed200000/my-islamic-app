@@ -16,10 +16,47 @@ class NotificationService {
     const android = AndroidInitializationSettings('@mipmap/ic_launcher');
     const ios = DarwinInitializationSettings();
     await _plugin.initialize(const InitializationSettings(android: android, iOS: ios));
-    await _plugin
-        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
-        ?.requestNotificationsPermission();
+    final androidImpl = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    await androidImpl?.requestNotificationsPermission();
+    try {
+      await androidImpl?.requestExactAlarmsPermission();
+    } catch (_) {}
     _ready = true;
+  }
+
+  Future<void> _safeSchedule(int id, String title, String body, DateTime when, String chId, String chName) async {
+    if (when.isBefore(DateTime.now())) return;
+    final details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        chId,
+        chName,
+        importance: Importance.max,
+        priority: Priority.high,
+      ),
+      iOS: const DarwinNotificationDetails(),
+    );
+    final tzTime = tz.TZDateTime.from(when, tz.local);
+    try {
+      await _plugin.zonedSchedule(
+        id,
+        title,
+        body,
+        tzTime,
+        details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+      );
+    } catch (_) {
+      await _plugin.zonedSchedule(
+        id,
+        title,
+        body,
+        tzTime,
+        details,
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+      );
+    }
   }
 
   Future<void> schedulePrayers(PrayerTimes pt, List<bool> enabled, bool khatmahFajr) async {
@@ -27,74 +64,58 @@ class NotificationService {
     for (int i = 0; i < 5; i++) {
       await _plugin.cancel(100 + i);
       final entry = pt.prayers[i];
-      if (!enabled[i] || entry.value.isBefore(DateTime.now())) continue;
-      await _plugin.zonedSchedule(
+      if (!enabled[i]) continue;
+      await _safeSchedule(
         100 + i,
         'حان وقت صلاة ${entry.key}',
         'حيّ على الصلاة — اللهم رب هذه الدعوة التامة',
-        tz.TZDateTime.from(entry.value, tz.local),
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            'adhan_channel',
-            'تنبيهات الأذان',
-            importance: Importance.max,
-            priority: Priority.high,
-          ),
-          iOS: DarwinNotificationDetails(),
-        ),
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+        entry.value,
+        'adhan_channel_v2',
+        'تنبيهات الأذان',
       );
     }
 
     await _plugin.cancel(110);
-    if (khatmahFajr && pt.fajr.isAfter(DateTime.now())) {
-      await _plugin.zonedSchedule(
+    if (khatmahFajr) {
+      await _safeSchedule(
         110,
         'ورد الختمة اليومي',
         'تذكير بقراءة وردك اليومي من القرآن الكريم بعد الفجر',
-        tz.TZDateTime.from(pt.fajr.add(const Duration(minutes: 20)), tz.local),
-        const NotificationDetails(
-          android: AndroidNotificationDetails('khatmah_channel', 'ورد القرآن'),
-          iOS: DarwinNotificationDetails(),
-        ),
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+        pt.fajr.add(const Duration(minutes: 20)),
+        'khatmah_channel_v2',
+        'ورد القرآن',
       );
     }
   }
 
-  /// جدولة إشعار الاستغفار وإشعار الصلاة على سيدنا محمد ﷺ في الخلفية
   Future<void> scheduleDhikrReminders({required bool istighfarOn, required bool salawatOn, int minutes = 5}) async {
     await init();
-    await _plugin.cancel(201);
-    await _plugin.cancel(202);
-    if (istighfarOn) {
-      await _plugin.periodicallyShow(
-        201,
-        'الاستغفار',
-        'أَسْتَغْفِرُ اللَّهَ الْعَظِيمَ وَأَتُوبُ إِلَيْهِ',
-        RepeatInterval.everyMinute, // في الإنتاج يمكن جدولته كل 5 دقائق عبر WorkManager/zonedSchedule
-        const NotificationDetails(
-          android: AndroidNotificationDetails('dhikr_channel', 'أذكار وتنبيهات دورية'),
-          iOS: DarwinNotificationDetails(),
-        ),
-        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-      );
+    for (int i = 0; i < 12; i++) {
+      await _plugin.cancel(200 + i);
+      await _plugin.cancel(300 + i);
     }
-    if (salawatOn) {
-      await _plugin.zonedSchedule(
-        202,
-        'صلِّ على سيدنا محمد ﷺ',
-        'اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ ﷺ',
-        tz.TZDateTime.now(tz.local).add(Duration(minutes: minutes)),
-        const NotificationDetails(
-          android: AndroidNotificationDetails('salawat_channel', 'الصلاة على النبي ﷺ'),
-          iOS: DarwinNotificationDetails(),
-        ),
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
-      );
+    final now = DateTime.now();
+    for (int i = 1; i <= 12; i++) {
+      if (istighfarOn) {
+        await _safeSchedule(
+          200 + i,
+          'الاستغفار',
+          'أَسْتَغْفِرُ اللَّهَ الْعَظِيمَ وَأَتُوبُ إِلَيْهِ',
+          now.add(Duration(minutes: i * minutes)),
+          'dhikr_channel_v2',
+          'تنبيه الاستغفار',
+        );
+      }
+      if (salawatOn) {
+        await _safeSchedule(
+          300 + i,
+          'صلِّ على سيدنا محمد ﷺ',
+          'اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ ﷺ',
+          now.add(Duration(minutes: i * minutes + (istighfarOn ? 2 : 0))),
+          'salawat_channel_v2',
+          'الصلاة على النبي ﷺ',
+        );
+      }
     }
   }
 }
