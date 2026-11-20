@@ -391,3 +391,46 @@ class AboutScreen extends StatelessWidget {
     );
   }
 }
+class InAppMosquesScreen extends StatefulWidget {
+  const InAppMosquesScreen({super.key});
+  @override
+  State<InAppMosquesScreen> createState() => _InAppMosquesScreenState();
+}
+
+class _InAppMosquesScreenState extends State<InAppMosquesScreen> {
+  WebViewController? _ctrl;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _initMap();
+  }
+
+  Future<void> _initMap() async {
+    final p = await DataService.prefs();
+    final idx = p.getInt('govIdx') ?? 0;
+    final lat = (idx == 27 ? p.getDouble('gpsLat') : null) ?? governorates[idx.clamp(0, 26)].lat;
+    final lng = (idx == 27 ? p.getDouble('gpsLng') : null) ?? governorates[idx.clamp(0, 26)].lng;
+    final c = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setNavigationDelegate(NavigationDelegate(
+        onPageFinished: (_) { if (mounted) setState(() => _loading = false); },
+      ))
+      ..loadRequest(Uri.parse('https://www.google.com/maps/search/mosque/@$lat,$lng,15z'));
+    if (mounted) setState(() => _ctrl = c);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('أقرب المساجد')),
+      body: Stack(
+        children: [
+          if (_ctrl != null) WebViewWidget(controller: _ctrl!),
+          if (_loading) const LinearProgressIndicator(),
+        ],
+      ),
+    );
+  }
+}
