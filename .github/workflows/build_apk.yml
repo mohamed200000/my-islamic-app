@@ -29,13 +29,14 @@ jobs:
           [ ! -d "android" ] && flutter create . --org com.islamicapp --platforms android
           mkdir -p android/app/src/main/res/raw
           [ -f assets/audio/adhan_4_egypt.mp3 ] && cp assets/audio/adhan_4_egypt.mp3 android/app/src/main/res/raw/adhan.mp3
+          [ -f assets/audio/istighfar.mp3 ] && cp assets/audio/istighfar.mp3 android/app/src/main/res/raw/istighfar.mp3
           pip install -q pillow
           python3 -c '
           import os, re
           p="android/app/src/main/AndroidManifest.xml"
           s=open(p,encoding="utf-8").read()
           s=re.sub(r"android:label=\"[^\"]*\"", "android:label=\"آثر المؤذن\"", s, count=1)
-          perms=["INTERNET","ACCESS_FINE_LOCATION","ACCESS_COARSE_LOCATION","POST_NOTIFICATIONS","SCHEDULE_EXACT_ALARM","RECEIVE_BOOT_COMPLETED"]
+          perms=["INTERNET","ACCESS_FINE_LOCATION","ACCESS_COARSE_LOCATION","POST_NOTIFICATIONS","SCHEDULE_EXACT_ALARM","USE_EXACT_ALARM","WAKE_LOCK","RECEIVE_BOOT_COMPLETED"]
           ins="\n    ".join(f"<uses-permission android:name=\"android.permission.{x}\"/>" for x in perms if x not in s)
           if ins: s=s.replace("<application",f"    {ins}\n    <application",1)
           rec="""<receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
