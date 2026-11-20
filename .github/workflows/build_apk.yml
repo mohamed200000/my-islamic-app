@@ -80,8 +80,8 @@ jobs:
                   im.resize((sz,sz),Image.LANCZOS).save(out,"PNG")
           '
       - run: flutter pub get
-      - run: flutter build apk --release --split-per-abi
+      - run: flutter build apk --release
       - uses: actions/upload-artifact@v4
         with:
           name: islamic-app-apk
-          path: build/app/outputs/flutter-apk/*-release.apk
+          path: build/app/outputs/flutter-apk/app-release.apk
