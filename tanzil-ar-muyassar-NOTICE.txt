@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+
+# --------------------------------------------------------------------
+#
+#  Quran Translation
+#  Name: تفسير المیسر
+#  Translator: King Fahad Quran Complex
+#  Language: Arabic
+#  ID: ar.muyassar
+#  Last Update: January 7, 2011
+#  Source: Tanzil.net
+#
+# --------------------------------------------------------------------
+	
+-->

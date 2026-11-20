@@ -1,0 +1,58 @@
+name: Build Islamic App APK
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Generate Android project & add permissions
+        run: |
+          if [ ! -d "android" ]; then
+            flutter create . --org com.islamicapp --platforms android
+          fi
+          python3 - << 'EOF'
+          p = "android/app/src/main/AndroidManifest.xml"
+          s = open(p, encoding="utf-8").read()
+          perms = [
+            '<uses-permission android:name="android.permission.INTERNET"/>',
+            '<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>',
+            '<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>',
+            '<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>',
+            '<uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>',
+            '<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>'
+          ]
+          inject = "\n    ".join(x for x in perms if x not in s)
+          if inject:
+              s = s.replace("<application", f"    {inject}\n    <application", 1)
+              open(p, "w", encoding="utf-8").write(s)
+          EOF
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Release APK
+        run: flutter build apk --release
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: islamic-app-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
