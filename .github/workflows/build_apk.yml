@@ -28,12 +28,14 @@ jobs:
           mv *-NOTICE.txt *-LICENSE-MIT.md licenses/ 2>/dev/null || true
           [ ! -d "android" ] && flutter create . --org com.islamicapp --platforms android
           python3 -c '
-          import os
+          import os, re
           p="android/app/src/main/AndroidManifest.xml"
-          s=open(p).read()
+          s=open(p,encoding="utf-8").read()
+          s=re.sub(r"android:label=\"[^\"]*\"", "android:label=\"آثر المؤذن\"", s, count=1)
           perms=["INTERNET","ACCESS_FINE_LOCATION","ACCESS_COARSE_LOCATION","POST_NOTIFICATIONS","SCHEDULE_EXACT_ALARM","RECEIVE_BOOT_COMPLETED"]
           ins="\n    ".join(f"<uses-permission android:name=\"android.permission.{x}\"/>" for x in perms if x not in s)
-          if ins: open(p,"w").write(s.replace("<application",f"    {ins}\n    <application",1))
+          if ins: s=s.replace("<application",f"    {ins}\n    <application",1)
+          open(p,"w",encoding="utf-8").write(s)
           kts="android/app/build.gradle.kts"
           gr="android/app/build.gradle"
           if os.path.exists(kts):
