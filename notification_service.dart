@@ -16,15 +16,62 @@ class NotificationService {
     const android = AndroidInitializationSettings('@mipmap/ic_launcher');
     const ios = DarwinInitializationSettings();
     await _plugin.initialize(const InitializationSettings(android: android, iOS: ios));
+    await requestPermissions();
+    _ready = true;
+  }
+
+  Future<void> requestPermissions() async {
     final androidImpl = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
     await androidImpl?.requestNotificationsPermission();
     try {
       await androidImpl?.requestExactAlarmsPermission();
     } catch (_) {}
-    _ready = true;
   }
 
-  Future<void> _safeSchedule(int id, String title, String body, DateTime when, String chId, String chName) async {
+  Future> checkPermissions() async {
+    await init();
+    final androidImpl = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    bool notif = true;
+    bool exact = true;
+    try {
+      notif = await androidImpl?.areNotificationsEnabled() ?? true;
+    } catch (_) {}
+    try {
+      exact = await androidImpl?.canScheduleExactNotifications() ?? true;
+    } catch (_) {}
+    return {'notif': notif, 'exact': exact};
+  }
+
+  Future<void> showDhikrNow() async {
+    await init();
+    await _plugin.show(
+      999,
+      'الاستغفار والصلاة على النبي ﷺ',
+      'أَسْتَغْفِرُ اللَّهَ الْعَظِيمَ وَأَتُوبُ إِلَيْهِ ✦ اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ ﷺ',
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'dhikr_channel_v4',
+          'تنبيه الاستغفار والصلاة على النبي ﷺ',
+          importance: Importance.max,
+          priority: Priority.high,
+          playSound: true,
+          sound: RawResourceAndroidNotificationSound('istighfar'),
+          visibility: NotificationVisibility.public,
+        ),
+        iOS: DarwinNotificationDetails(),
+      ),
+    );
+  }
+
+  Future<void> _safeSchedule(
+    int id,
+    String title,
+    String body,
+    DateTime when,
+    String chId,
+    String chName, {
+    String? rawSound,
+  }) async {
     if (when.isBefore(DateTime.now())) return;
     final details = NotificationDetails(
       android: AndroidNotificationDetails(
@@ -32,6 +79,9 @@ class NotificationService {
         chName,
         importance: Importance.max,
         priority: Priority.high,
+        playSound: true,
+        sound: rawSound != null ? RawResourceAndroidNotificationSound(rawSound) : null,
+        visibility: NotificationVisibility.public,
       ),
       iOS: const DarwinNotificationDetails(),
     );
@@ -70,8 +120,9 @@ class NotificationService {
         'حان وقت صلاة ${entry.key}',
         'حيّ على الصلاة — اللهم رب هذه الدعوة التامة',
         entry.value,
-        'adhan_channel_v2',
-        'تنبيهات الأذان',
+        'adhan_channel_v4',
+        'صوت الأذان',
+        rawSound: 'adhan',
       );
     }
 
@@ -90,32 +141,25 @@ class NotificationService {
 
   Future<void> scheduleDhikrReminders({required bool istighfarOn, required bool salawatOn, int minutes = 5}) async {
     await init();
-    for (int i = 0; i < 12; i++) {
+    for (int i = 0; i < 24; i++) {
       await _plugin.cancel(200 + i);
-      await _plugin.cancel(300 + i);
     }
+    if (!istighfarOn && !salawatOn) return;
+    final parts = <String>[];
+    if (istighfarOn) parts.add('أَسْتَغْفِرُ اللَّهَ الْعَظِيمَ وَأَتُوبُ إِلَيْهِ');
+    if (salawatOn) parts.add('اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ ﷺ');
+    final msg = parts.join(' ✦ ');
     final now = DateTime.now();
-    for (int i = 1; i <= 12; i++) {
-      if (istighfarOn) {
-        await _safeSchedule(
-          200 + i,
-          'الاستغفار',
-          'أَسْتَغْفِرُ اللَّهَ الْعَظِيمَ وَأَتُوبُ إِلَيْهِ',
-          now.add(Duration(minutes: i * minutes)),
-          'dhikr_channel_v2',
-          'تنبيه الاستغفار',
-        );
-      }
-      if (salawatOn) {
-        await _safeSchedule(
-          300 + i,
-          'صلِّ على سيدنا محمد ﷺ',
-          'اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ ﷺ',
-          now.add(Duration(minutes: i * minutes + (istighfarOn ? 2 : 0))),
-          'salawat_channel_v2',
-          'الصلاة على النبي ﷺ',
-        );
-      }
+    for (int i = 1; i <= 24; i++) {
+      await _safeSchedule(
+        200 + i,
+        'الاستغفار والصلاة على النبي ﷺ',
+        msg,
+        now.add(Duration(minutes: i * minutes)),
+        'dhikr_channel_v4',
+        'تنبيه الاستغفار والصلاة على النبي ﷺ',
+        rawSound: 'istighfar',
+      );
     }
   }
 }
