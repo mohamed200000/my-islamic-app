@@ -42,25 +42,49 @@ class NotificationService {
     return {'notif': notif, 'exact': exact};
   }
 
-  Future<void> showDhikrNow() async {
+  Future<String?> showDhikrNow() async {
     await init();
-    await _plugin.show(
-      999,
-      'الاستغفار والصلاة على النبي ﷺ',
-      'أَسْتَغْفِرُ اللَّهَ الْعَظِيمَ وَأَتُوبُ إِلَيْهِ ✦ اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ ﷺ',
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'dhikr_channel_v4',
-          'تنبيه الاستغفار والصلاة على النبي ﷺ',
-          importance: Importance.max,
-          priority: Priority.high,
-          playSound: true,
-          sound: RawResourceAndroidNotificationSound('istighfar'),
-          visibility: NotificationVisibility.public,
+    try {
+      await _plugin.show(
+        999,
+        'الاستغفار والصلاة على النبي ﷺ',
+        'أَسْتَغْفِرُ اللَّهَ الْعَظِيمَ وَأَتُوبُ إِلَيْهِ ✦ اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ ﷺ',
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'dhikr_channel_v5',
+            'تنبيه الاستغفار والصلاة على النبي ﷺ',
+            importance: Importance.max,
+            priority: Priority.high,
+            playSound: true,
+            sound: RawResourceAndroidNotificationSound('istighfar'),
+            visibility: NotificationVisibility.public,
+          ),
+          iOS: DarwinNotificationDetails(),
         ),
-        iOS: DarwinNotificationDetails(),
-      ),
-    );
+      );
+      return null;
+    } catch (_) {
+      try {
+        await _plugin.show(
+          999,
+          'الاستغفار والصلاة على النبي ﷺ',
+          'أَسْتَغْفِرُ اللَّهَ الْعَظِيمَ وَأَتُوبُ إِلَيْهِ ✦ اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ ﷺ',
+          const NotificationDetails(
+            android: AndroidNotificationDetails(
+              'dhikr_channel_fallback',
+              'تنبيه الاستغفار العام',
+              importance: Importance.max,
+              priority: Priority.high,
+              visibility: NotificationVisibility.public,
+            ),
+            iOS: DarwinNotificationDetails(),
+          ),
+        );
+        return null;
+      } catch (e2) {
+        return e2.toString();
+      }
+    }
   }
 
   Future<void> _safeSchedule(
@@ -97,15 +121,17 @@ class NotificationService {
         uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
       );
     } catch (_) {
-      await _plugin.zonedSchedule(
-        id,
-        title,
-        body,
-        tzTime,
-        details,
-        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
-      );
+      try {
+        await _plugin.zonedSchedule(
+          id,
+          title,
+          body,
+          tzTime,
+          details,
+          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+        );
+      } catch (_) {}
     }
   }
 
@@ -120,7 +146,7 @@ class NotificationService {
         'حان وقت صلاة ${entry.key}',
         'حيّ على الصلاة — اللهم رب هذه الدعوة التامة',
         entry.value,
-        'adhan_channel_v4',
+        'adhan_channel_v5',
         'صوت الأذان',
         rawSound: 'adhan',
       );
@@ -156,7 +182,7 @@ class NotificationService {
         'الاستغفار والصلاة على النبي ﷺ',
         msg,
         now.add(Duration(minutes: i * minutes)),
-        'dhikr_channel_v4',
+        'dhikr_channel_v5',
         'تنبيه الاستغفار والصلاة على النبي ﷺ',
         rawSound: 'istighfar',
       );
