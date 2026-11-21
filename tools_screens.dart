@@ -1,9 +1,9 @@
-import 'package:geolocator/geolocator.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import '../services/data_service.dart';
@@ -216,31 +216,52 @@ class _RemindersScreenState extends State<RemindersScreen> {
   bool _salawat = false;
   int _minutes = 5;
   int _secLeft = 300;
+  int _nextAtMs = 0;
   Timer? _timer;
 
   @override
   void initState() {
     super.initState();
-    DataService.prefs().then((p) {
-      if (mounted) {
-        setState(() {
-          _istighfar = p.getBool('remIstighfar') ?? false;
-          _salawat = p.getBool('remSalawat') ?? false;
-          _minutes = p.getInt('remMinutes') ?? 5;
-          _secLeft = _minutes * 60;
-        });
-      }
-    });
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted || (!_istighfar && !_salawat)) return;
+    _loadState();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
+  }
+
+  Future<void> _loadState() async {
+    final p = await DataService.prefs();
+    final ist = p.getBool('remIstighfar') ?? false;
+    final sal = p.getBool('remSalawat') ?? false;
+    final mins = p.getInt('remMinutes') ?? 5;
+    int nextAt = p.getInt('remNextAt') ?? 0;
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    if ((ist || sal) && nextAt <= nowMs) {
+      nextAt = nowMs + mins * 60000;
+      await p.setInt('remNextAt', nextAt);
+    }
+    if (mounted) {
       setState(() {
-        if (_secLeft > 1) {
-          _secLeft--;
-        } else {
-          _secLeft = _minutes * 60;
-        }
+        _istighfar = ist;
+        _salawat = sal;
+        _minutes = mins;
+        _nextAtMs = nextAt;
+        _secLeft = nextAt > nowMs ? ((nextAt - nowMs) / 1000).ceil() : mins * 60;
       });
-    });
+    }
+  }
+
+  void _tick() async {
+    if (!mounted || (!_istighfar && !_salawat)) return;
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    if (_nextAtMs <= nowMs) {
+      final nextAt = nowMs + _minutes * 60000;
+      _nextAtMs = nextAt;
+      (await DataService.prefs()).setInt('remNextAt', nextAt);
+      await NotificationService.instance.showDhikrNow();
+    }
+    if (mounted) {
+      setState(() {
+        _secLeft = ((_nextAtMs - nowMs) / 1000).ceil().clamp(0, _minutes * 60);
+      });
+    }
   }
 
   @override
@@ -254,7 +275,14 @@ class _RemindersScreenState extends State<RemindersScreen> {
     await p.setBool('remIstighfar', _istighfar);
     await p.setBool('remSalawat', _salawat);
     await p.setInt('remMinutes', _minutes);
-    setState(() => _secLeft = _minutes * 60);
+    final nextAt = DateTime.now().millisecondsSinceEpoch + _minutes * 60000;
+    await p.setInt('remNextAt', nextAt);
+    if (mounted) {
+      setState(() {
+        _nextAtMs = nextAt;
+        _secLeft = _minutes * 60;
+      });
+    }
     await NotificationService.instance.scheduleDhikrReminders(
       istighfarOn: _istighfar,
       salawatOn: _salawat,
@@ -598,6 +626,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     final p = await DataService.prefs();
                     await p.setBool('remIstighfar', v);
                     await p.setBool('remSalawat', v);
+                    await p.setInt('remNextAt', DateTime.now().millisecondsSinceEpoch + 300000);
                     await NotificationService.instance.scheduleDhikrReminders(istighfarOn: v, salawatOn: v, minutes: 5);
                   },
                 ),
@@ -653,7 +682,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   OutlinedButton.icon(
                     icon: const Icon(Icons.notifications_active),
                     label: const Text('جرّب إشعار الاستغفار والصلاة الآن'),
-                    onPressed: () => NotificationService.instance.showDhikrNow(),
+                    onPressed: () async {
+                      final err = await NotificationService.instance.showDhikrNow();
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(err == null ? 'تم إرسال الإشعار بنجاح' : 'تعذر الإشعار: $err')),
+                      );
+                    },
                   ),
                 ],
               ),
