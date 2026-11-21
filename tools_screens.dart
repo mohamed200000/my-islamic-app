@@ -1,3 +1,4 @@
+import 'package:geolocator/geolocator.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:audioplayers/audioplayers.dart';
@@ -536,24 +537,128 @@ class _UsersStatsScreenState extends State<UsersStatsScreen> {
   }
 }
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   final void Function(bool dark) onThemeChanged;
   final ThemeMode themeMode;
   const SettingsScreen({super.key, required this.onThemeChanged, required this.themeMode});
 
   @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  bool _notifOk = true;
+  bool _exactOk = true;
+  bool _gpsOk = false;
+  bool _istighfarOn = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _refresh();
+  }
+
+  Future<void> _refresh() async {
+    final res = await NotificationService.instance.checkPermissions();
+    final perm = await Geolocator.checkPermission();
+    final p = await DataService.prefs();
+    if (mounted) {
+      setState(() {
+        _notifOk = res['notif'] ?? false;
+        _exactOk = res['exact'] ?? false;
+        _gpsOk = perm == LocationPermission.always || perm == LocationPermission.whileInUse;
+        _istighfarOn = p.getBool('remIstighfar') ?? false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final isDark = themeMode == ThemeMode.dark;
+    final isDark = widget.themeMode == ThemeMode.dark;
     return Scaffold(
-      appBar: AppBar(title: const Text('الإعدادات')),
+      appBar: AppBar(title: const Text('الإعدادات والأذونات')),
       body: ListView(
+        padding: const EdgeInsets.all(14),
         children: [
-          SwitchListTile(
-            title: const Text('الوضع الداكن'),
-            value: isDark,
-            onChanged: onThemeChanged,
+          Card(
+            child: Column(
+              children: [
+                SwitchListTile(
+                  title: const Text('الوضع الداكن'),
+                  subtitle: const Text('مناسب للقراءة الليلية وتخفيف إجهاد العين'),
+                  value: isDark,
+                  onChanged: widget.onThemeChanged,
+                ),
+                SwitchListTile(
+                  title: const Text('تفعيل إشعارات الاستغفار والصلاة على النبي ﷺ'),
+                  subtitle: const Text('إشعار بصوت الاستغفار كل ٥ دقائق'),
+                  value: _istighfarOn,
+                  onChanged: (v) async {
+                    setState(() => _istighfarOn = v);
+                    final p = await DataService.prefs();
+                    await p.setBool('remIstighfar', v);
+                    await p.setBool('remSalawat', v);
+                    await NotificationService.instance.scheduleDhikrReminders(istighfarOn: v, salawatOn: v, minutes: 5);
+                  },
+                ),
+              ],
+            ),
           ),
-          const Divider(),
+          const SizedBox(height: 10),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text('حالة أذونات التطبيق على الهاتف', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  ListTile(
+                    title: const Text('إذن الإشعارات'),
+                    trailing: Text(_notifOk ? 'مفعّل ✓' : 'مغلق ✗', style: TextStyle(color: _notifOk ? Colors.green : Colors.red, fontWeight: FontWeight.bold)),
+                  ),
+                  ListTile(
+                    title: const Text('إذن المنبهات الدقيقة (للأذان والذكر)'),
+                    trailing: Text(_exactOk ? 'مفعّل ✓' : 'مغلق ✗', style: TextStyle(color: _exactOk ? Colors.green : Colors.red, fontWeight: FontWeight.bold)),
+                  ),
+                  ListTile(
+                    title: const Text('إذن الموقع الجغرافي (GPS)'),
+                    trailing: Text(_gpsOk ? 'مفعّل ✓' : 'مغلق ✗', style: TextStyle(color: _gpsOk ? Colors.green : Colors.red, fontWeight: FontWeight.bold)),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: () async {
+                            await NotificationService.instance.requestPermissions();
+                            await Geolocator.requestPermission();
+                            await _refresh();
+                          },
+                          child: const Text('منح الأذونات'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () async {
+                            await Geolocator.openAppSettings();
+                          },
+                          child: const Text('إعدادات الهاتف'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.notifications_active),
+                    label: const Text('جرّب إشعار الاستغفار والصلاة الآن'),
+                    onPressed: () => NotificationService.instance.showDhikrNow(),
+                  ),
+                ],
+              ),
+            ),
+          ),
           const Padding(
             padding: EdgeInsets.all(16),
             child: Text('نسخة مجانية · صدقة جارية عني وعن عائلتي وعن جميع المسلمين\nتصميم: محمد بن جاسر بن محمد حسين', textAlign: TextAlign.center),
